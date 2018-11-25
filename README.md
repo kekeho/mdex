@@ -14,7 +14,7 @@ Dual atmark extends source code.
 ```markdown:
 Threre is code.
 @@ mdex.py
-↑That's my code
+↑That's my code.
 ```
 ### After
 ```markdown:
@@ -26,4 +26,5 @@ import mimetypes
 ︙
 ︙
 ｀｀｀
+↑That's my code.
 ```
