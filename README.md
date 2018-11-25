@@ -19,11 +19,11 @@ Threre is code.
 ### After
 ```markdown:
 There is code.
-\\\```python:
+｀｀｀python:
 #!/usr/bin/env python3
 import sys
 import mimetypes
 ︙
 ︙
-\\\```
+｀｀｀
 ```
