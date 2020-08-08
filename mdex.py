@@ -2,6 +2,8 @@
 import sys
 import mimetypes
 
+import lib
+
 
 class NotTextFileError(Exception):
     def __init__(self, mime, encode):
@@ -28,33 +30,39 @@ class MarkdownEx():
         self.md_filename = filename
         self.md_file = open(filename, 'r')
         self.output_md_text = self.md_file.read()
+        self.exfunc_list = [self.file_expand, self.index]
 
     def __del__(self):
         # file closure
         self.md_file.close()
+    
+
+    def compile(self):
+        for f in self.exfunc_list:
+            f()
+    
 
     def file_expand(self):
         return_md = """"""
         line_array = self.output_md_text.split('\n')
         for line in line_array:
-            atmark_position = line.find('@@')
-
-            if atmark_position == -1 or atmark_position != 0:
+            if not lib.match_tag(line, 'SOURCE'):
                 # not found or not in the head of line
                 return_md += '\n' + line
                 continue
 
-            include_filename = line[3:].split(' ')[0]
+            include_filename = lib.tag_param(line)
 
             mime, encode = mimetypes.guess_type(include_filename)
             text_or_binary, filetype = mime.split('/')
             if text_or_binary != 'text':
                 raise NotTextFileError(mime, encode)
 
+            line = f"{include_filename}\n"
             with open(include_filename, 'r') as in_file:
                 in_file_content = in_file.read()
 
-                line = f'```{filetype}:{include_filename}\n'
+                line += f'```{filetype}:{include_filename}\n'
                 line += in_file_content
                 line += '\n```'
 
@@ -63,6 +71,46 @@ class MarkdownEx():
 
         # return
         self.output_md_text = return_md
+    
+
+    def index(self):
+        ignore_tags = ['```']
+        index_list = []
+        ignore_flag = False
+        for line in self.output_md_text.split('\n'):
+            for ignore_tag in ignore_tags:
+                if lib.match_tag(line, ignore_tag):
+                    ignore_flag = lib.reverse_bool(ignore_flag)
+
+            trigger_position = line.find('#')
+            if trigger_position == -1 or trigger_position != 0 or ignore_flag:
+                # not found or not in the head of line
+                continue
+            
+            # count header level
+            level = 0
+            while True:
+                try:
+                    if line[level] != '#':
+                        break
+                except IndexError:
+                    break
+                level += 1
+            if level >= 2:
+                index_list.append({'level': level, 'title': line.replace('#', '')[1:]})
+
+        return_md = ''
+        for line in self.output_md_text.split('\n'):
+            if lib.match_tag(line, 'INDEX'):
+                for index in index_list:
+                    space = "    " * (index['level']-2)
+                    return_md += f'{space}- [{index["title"]}](#{index["title"]})\n'
+            else:
+                return_md += f'{line}\n'
+        
+        self.output_md_text = return_md
+
+
 
     def save(self, samefile=False):
         if samefile is True:
@@ -84,5 +132,5 @@ if __name__ == "__main__":
 
     filename = sys.argv[1]
     md = MarkdownEx(sys.argv[1])
-    md.file_expand()
+    md.compile()
     md.save()
