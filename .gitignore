@@ -1,1 +1,5 @@
 *__pycache__
+.vscode/
+.mdexignore
+test.md
+test_converted.md

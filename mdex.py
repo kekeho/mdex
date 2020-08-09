@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import mimetypes
+from glob import glob
 
 import lib
 
@@ -30,7 +31,7 @@ class MarkdownEx():
         self.md_filename = filename
         self.md_file = open(filename, 'r')
         self.output_md_text = self.md_file.read()
-        self.exfunc_list = [self.file_expand, self.index]
+        self.exfunc_list = [self.sources_in_dir, self.file_expand, self.index]
 
     def __del__(self):
         # file closure
@@ -54,13 +55,19 @@ class MarkdownEx():
             include_filename = lib.tag_param(line)
 
             mime, encode = mimetypes.guess_type(include_filename)
-            text_or_binary, filetype = mime.split('/')
-            if text_or_binary != 'text':
-                raise NotTextFileError(mime, encode)
+            if mime is not None:
+                text_or_binary, filetype = mime.split('/')
+            else:
+                text_or_binary = 'text'
+                filetype = ''
 
             line = f"{include_filename}\n"
             with open(include_filename, 'r') as in_file:
-                in_file_content = in_file.read()
+                try:
+                    in_file_content = in_file.read()
+                except UnicodeDecodeError:
+                    # binary
+                    continue
 
                 line += f'```{filetype}:{include_filename}\n'
                 line += in_file_content
@@ -73,17 +80,37 @@ class MarkdownEx():
         self.output_md_text = return_md
     
 
+    def sources_in_dir(self):
+        ignore_tags = ['```']
+        try:
+            with open('.mdexignore', 'r') as igfp:
+                ignore_list = igfp.read().split('\n')
+        except FileNotFoundError:
+            ignore_list = []
+        return_md = ''
+
+        for line in self.output_md_text.split('\n'):
+            if not lib.match_tag(line, 'SOURCES_IN_DIR'):
+                return_md += f'{line}\n'
+                continue
+
+            dirname = lib.tag_param(line)
+            filelist = lib.glob_tree(dirname, ignore_list)
+            return_md += lib.hoge(filelist)
+
+        self.output_md_text = return_md
+    
+
     def index(self):
         ignore_tags = ['```']
         index_list = []
         ignore_flag = False
-        for line in self.output_md_text.split('\n'):
+        for idx, line in enumerate(self.output_md_text.split('\n')):
             for ignore_tag in ignore_tags:
                 if lib.match_tag(line, ignore_tag):
                     ignore_flag = lib.reverse_bool(ignore_flag)
 
-            trigger_position = line.find('#')
-            if trigger_position == -1 or trigger_position != 0 or ignore_flag:
+            if len(line) <= 0 or line[0] != '#' or ignore_flag:
                 # not found or not in the head of line
                 continue
             
@@ -97,7 +124,7 @@ class MarkdownEx():
                     break
                 level += 1
             if level >= 2:
-                index_list.append({'level': level, 'title': line.replace('#', '')[1:]})
+                index_list.append({'level': level, 'title': line.replace('#', '')[1:], 'line': idx})
 
         return_md = ''
         for line in self.output_md_text.split('\n'):
